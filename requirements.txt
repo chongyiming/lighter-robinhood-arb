@@ -1,0 +1,10 @@
+# Lighter x Lighter-on-Robinhood BTC arbitrage.
+# Engine and venue adapter derived from entropy-arb (MIT), see LICENSE.entropy-arb.
+aiohttp>=3.9
+websockets>=12.0
+python-dotenv>=1.0
+PyYAML>=6.0
+rich>=13.0
+
+# Lighter transaction signing (>=1.1.2 knows the Robinhood chain id 466324)
+lighter-sdk>=1.1.2

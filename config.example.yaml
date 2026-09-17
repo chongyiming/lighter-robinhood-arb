@@ -1,0 +1,78 @@
+# Lighter 主网 × Lighter on Robinhood Chain — BTC 套利策略配置
+#
+#   python3 main.py --base lighter --hedge lighter-rh --symbol BTC
+#
+# 本文件就是策略本身；密钥在 .env。所有键名都会校验，拼错会直接报错。
+#
+# 信号定义： premium_bps = (Lighter 价 / Robinhood 价 - 1) * 10000
+#   卖 Lighter / 买 Robinhood ：可执行溢价 >= midline + upper
+#   买 Lighter / 卖 Robinhood ：可执行溢价 <= midline - lower
+# 两个门槛都已扣除双边吃单手续费，所以一次完整往返扣费后净赚 >= upper + lower。
+
+# ============================ 信号 / THE SIGNAL ============================
+# midline +0.33 来自 data/premium_data.csv 的 3941 行（2026-09-13 ~ 09-16）中位数。
+# 用这份历史数据回测 ±1.0 带宽：3 天 8 次往返、合计约 21.7 bps。
+# 注意：历史数据是顶档价差，新引擎用的是吃掉深度后的边际价差，会更严格，
+# 因此实际触发次数会比回测少。先 --record-only 跑一段，再用 tools/analyze.py 复核。
+thresholds:
+  midline_bps: 0.328 # 溢价长期中枢
+  upper_bps: 1 # 中枢上方入场带宽（卖 Lighter）
+  lower_bps: 1 # 中枢下方入场带宽（买 Lighter）
+
+# ======================== 交易所参数 / VENUES ==============================
+# base 段 = 基准腿（--base，默认 Lighter 主网）；hedge 段 = 对冲腿（默认 RH）。
+# max_orders_per_min：Lighter 上限约 40/分钟，两条腿都必须压到 30。
+base:
+  taker_fee_bps: 0.0
+  max_position_usd: 60 # 单边持仓上限（美元）
+  max_orders_per_min: 30
+
+hedge:
+  taker_fee_bps: 0.0
+  max_position_usd: 60
+  max_orders_per_min: 30
+
+# ========================= 下单规模 / SIZING ===============================
+# 单量不再是固定值：先算当前价差下还能吃多少量，再吃其中 take_fraction，
+# 并受 max_order_notional_usd 和持仓上限裁剪。
+# 下限很关键：Robinhood 的 BTC 最小单量是 0.0002 BTC（约 $16），
+# 所以 max_order_notional_usd 必须明显高于它，否则永远下不出单。
+sizing:
+  take_fraction: 0.5
+  max_order_notional_usd: 30 # 单笔名义上限（约 0.00038 BTC）
+  min_order_notional_usd: 10
+
+# ======================= 库存阶梯 / INVENTORY LADDER =======================
+# 持仓超过上限的 floor_frac 后，同方向继续加仓需要额外溢价，满仓时加到 scale_bps。
+inventory:
+  scale_bps: 10.0
+  floor_frac: 0.5
+
+# ========================== 执行 / EXECUTION ==============================
+execution:
+  premium_persist_sec: 0.3 # 信号需持续这么久才下单，过滤一跳假信号
+  cooldown_sec: 0.0 # 两次执行的最小间隔
+  settle_timeout_sec: 10.0 # 等成交确认（account_orders 频道）
+  leg_slippage_bps: 10.0 # 每腿保护价；套利边际只有几 bps，不能放太松
+  hedge_slippage_bps: 20.0 # 对冲减仓的保护价，放宽以保证能成交
+  net_tolerance_base: 0.0002 # 允许的净敞口(BTC)，等于 RH 最小单量：更小也对冲不掉
+  max_consecutive_errors: 3 # 连续失败 N 次后停机，等人工处理
+  rate_limit_pause_sec: 10.0
+  staleness_sec: 10.0 # 盘口断连判定
+  reconcile_sec: 15.0 # REST 持仓核对周期
+  venue_probe_sec: 30.0
+  http_keepalive_sec: 10.0
+
+# ========================= 数据采集 / RECORDER =============================
+# 运行期间每秒采样双边盘口，每分钟写一行，供 tools/analyze.py 复核阈值。
+recorder:
+  enabled: true
+  csv: logs/minutes.csv
+
+# ====================== 日志与仪表盘 / LOGGING =============================
+logging:
+  level: INFO
+  status_interval_sec: 30.0
+  trades_csv: logs/trades.csv
+  dashboard: true
+  file: logs/engine.log
