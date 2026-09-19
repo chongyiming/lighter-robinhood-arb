@@ -18,8 +18,7 @@ small position caps.
 On a terminal the bot shows a live Rich dashboard (books, signal, positions,
 PnL, last executions) and writes log lines to logging.file; use
 --no-dashboard for plain console logs (nohup/systemd). Strategy lives in
-config.yaml, credentials in .env — see the README (English) /
-README.zh-CN.md (中文).
+config.yaml, credentials in .env — see the README.
 """
 import argparse
 import asyncio
@@ -83,17 +82,15 @@ def main() -> None:
                     "Robinhood Chain. Without --record-only, real orders "
                     "are sent.")
     p.add_argument("--symbol", required=True,
-                   help="symbol traded on both venues, e.g. BTC / "
-                        "两个交易所共同交易的品种")
+                   help="symbol traded on both venues, e.g. BTC")
     p.add_argument("--base", default="lighter", choices=VENUES,
                    metavar="VENUE",
                    help=f"base leg, one of: {', '.join(VENUES)} "
-                        f"(default: lighter). premium = base / hedge - 1 / "
-                        f"基准腿，溢价 = 基准腿 / 对冲腿 - 1")
+                        f"(default: lighter). premium = base / hedge - 1")
     p.add_argument("--hedge", default="lighter-rh", choices=VENUES,
                    metavar="VENUE",
                    help=f"hedge leg, one of: {', '.join(VENUES)} "
-                        f"(default: lighter-rh) / 对冲腿")
+                        f"(default: lighter-rh)")
     p.add_argument("--config", default="config.yaml",
                    help="strategy config (default: config.yaml)")
     p.add_argument("--env-file", default=".env",
@@ -102,7 +99,7 @@ def main() -> None:
                    help="only collect minute data, run no strategy, send no "
                         "orders (needs no credentials)")
     p.add_argument("--cn", action="store_true",
-                   help="display the dashboard in Chinese / 仪表盘使用中文")
+                   help="display the dashboard in Chinese")
     disp = p.add_mutually_exclusive_group()
     disp.add_argument("--dashboard", action="store_true",
                       help="force the Rich dashboard even without a tty")

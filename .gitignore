@@ -1,8 +1,8 @@
-# secrets & local config / 密钥与本地配置
+# secrets & local config
 .env
 config.yaml
 
-# runtime output / 运行时输出
+# runtime output
 data/
 logs/
 *.log

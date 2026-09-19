@@ -8,9 +8,6 @@ and prints:
   * how often each candidate upper/lower band would have fired,
   * a ready-to-paste `thresholds:` snippet.
 
-分析机器人自动采集的分钟级盘口数据，输出溢价分布、各档阈值的触发频率，
-以及可直接粘贴进 config.yaml 的 thresholds 建议值。
-
 Usage:
     python3 tools/analyze.py                    # logs/minutes.csv
     python3 tools/analyze.py --csv path.csv --hours 24 --min-samples 10
@@ -79,13 +76,13 @@ def main() -> None:
         rows = load_rows(args.csv, args.hours, args.min_samples)
     except FileNotFoundError:
         print(f"{args.csv} not found — run the bot (even --record-only) to "
-              f"collect data first / 未找到数据文件，请先运行机器人采集数据",
+              f"collect data first",
               file=sys.stderr)
         sys.exit(1)
     if len(rows) < 30:
         print(f"only {len(rows)} usable minute(s) in {args.csv} — collect at "
-              f"least a few hours before trusting the numbers / 数据太少，"
-              f"建议至少采集数小时", file=sys.stderr)
+              f"least a few hours before trusting the numbers",
+              file=sys.stderr)
         if not rows:
             sys.exit(1)
 
@@ -96,8 +93,7 @@ def main() -> None:
     median = pctl(prem, 50)
 
     print(f"\n=== {args.csv}: {len(rows)} minutes over {span_h:.1f}h ===\n")
-    print("premium of base over hedge, minute close (bps) / "
-          "基准腿相对对冲腿的溢价:")
+    print("premium of base over hedge, minute close (bps):")
     print(f"  mean {mean:+.2f}   std {math.sqrt(var):.2f}   "
           f"median {median:+.2f}")
     print(f"  p5 {pctl(prem, 5):+.2f}   p25 {pctl(prem, 25):+.2f}   "
@@ -114,8 +110,7 @@ def main() -> None:
                       reverse=True)
 
     print(f"\nwith midline_bps = {midline:+.1f} (median) and {fees:.1f} bps "
-          f"round-trip taker fees, minutes each band would have fired / "
-          f"各档净阈值触发的分钟数:")
+          f"round-trip taker fees, minutes each band would have fired:")
     print(f"  {'band bps':>9} | {'SELL base':>17} | {'BUY base':>17}")
     print(f"  {'':>9} | {'minutes':>8} {'per day':>8} | "
           f"{'minutes':>8} {'per day':>8}")
@@ -133,9 +128,7 @@ def main() -> None:
     print(f"""
 suggested starting point (fires ~10% of minutes, already net of the
 {fees:.1f} bps fees passed via --fees-bps; a full round trip nets
->= upper+lower bps after fees) /
-建议起点（约 10% 的分钟触发；已扣除 --fees-bps 传入的 {fees:.1f} bps 手续费，
-一次完整往返扣费后净赚 >= upper+lower bps）:
+>= upper+lower bps after fees):
 
 thresholds:
   midline_bps: {midline}
@@ -143,7 +136,7 @@ thresholds:
   lower_bps: {sug_lower}
 
 Re-run with --hours to focus on recent regimes; premiums drift, so refresh
-these numbers regularly. / 溢价中枢会漂移，请定期重新分析并更新配置。
+these numbers regularly.
 """)
 
 

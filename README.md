@@ -1,51 +1,51 @@
 # lighter-robinhood-arb
 
-Lighter 主网 × Lighter on Robinhood Chain 的 BTC 永续套利机器人。
+A BTC perpetual arbitrage bot between Lighter mainnet and Lighter on Robinhood Chain.
 
-引擎、盘口、下单、对冲的实现来自 [entropy-arb](https://github.com/your-quantguy/entropy-arb)（MIT，见 `LICENSE.entropy-arb`）。本仓库做了两处改动：让两条腿都是 zkLighter 部署（上游的基准腿固定在 Hyperliquid 上），并移除了全部 Hyperliquid / Entropy 相关代码。
+The engine, order book, order placement and hedging code come from [entropy-arb](https://github.com/your-quantguy/entropy-arb) (MIT, see `LICENSE.entropy-arb`). This repo makes two changes: both legs are zkLighter deployments (upstream's base leg is fixed to Hyperliquid), and all Hyperliquid / Entropy code has been removed.
 
-## 信号
+## Signal
 
 ```
-premium_bps = (Lighter 价 / Robinhood 价 - 1) * 10000
+premium_bps = (Lighter price / Robinhood price - 1) * 10000
 
-卖 Lighter / 买 Robinhood   当可执行溢价 >= midline + upper
-买 Lighter / 卖 Robinhood   当可执行溢价 <= midline - lower
+Sell Lighter / buy Robinhood   when executable premium >= midline + upper
+Buy Lighter / sell Robinhood   when executable premium <= midline - lower
 ```
 
-三个阈值写死在 `config.yaml`，两个门槛都已扣除双边吃单手续费，所以一次完整往返扣费后净赚 >= `upper + lower` bps。
+The three thresholds are fixed in `config.yaml`. Both hurdles are already net of taker fees on both legs, so one full round trip nets >= `upper + lower` bps after fees.
 
-## 用法
+## Usage
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env          # 填两组密钥：主网 LIGHTER_*，Robinhood 链 RH_*
+cp .env.example .env          # fill in two sets of keys: mainnet LIGHTER_*, Robinhood Chain RH_*
 
-# 1. 先采集数据，不下单、不需要密钥
+# 1. Collect data first: no orders, no keys needed
 python3 main.py --record-only --symbol BTC
 
-# 2. 用采集到的数据复核阈值，填进 config.yaml
+# 2. Re-check the thresholds against the collected data and put them in config.yaml
 python3 tools/analyze.py
 
-# 3. 实盘（会下真单）。--cn 中文仪表盘
-python3 main.py --symbol BTC --cn
+# 3. Live trading (places real orders). Add --cn for a Chinese dashboard
+python3 main.py --symbol BTC
 ```
 
-两条腿默认是 `--base lighter`（主网）和 `--hedge lighter-rh`（Robinhood 链），对调这两个参数即可反转溢价方向。
+The legs default to `--base lighter` (mainnet) and `--hedge lighter-rh` (Robinhood Chain); swap the two arguments to invert the premium direction.
 
-没有模拟盘模式：要么 `--record-only` 采集，要么实盘。**先把 `config.yaml` 里的 `max_position_usd` 调到很小再开实盘。**
+There is no paper-trading mode: it's either `--record-only` data collection or live trading. **Set `max_position_usd` in `config.yaml` very small before going live.**
 
-两条腿是两个独立账户，各自的 API key 必须分别注册。
+The two legs are separate accounts, and each needs its own API key registered.
 
-## 它怎么工作
+## How it works
 
-- **行情**：订阅两边的 `order_book` 全深度（快照 + 增量）。增量带 nonce，一旦跳号说明丢了更新，直接清空重订阅，绝不拿残缺盘口报价。静市不算行情过期，只有连接断了才算。
-- **下单量**：先逐档算出当前价差下还能吃多少量，再吃其中 `take_fraction`，并受单笔名义上限和持仓上限裁剪。不是固定单量。
-- **成交确认**：两腿同时发 IOC 单，通过认证的 `account_orders` 频道等每单终态，拿到精确成交量和均价。
-- **两腿不平衡**：净敞口超过 `net_tolerance_base` 时，用 `reduce_only` 减掉多出来的那条腿（只减不加，保证金不足也不会被拒），而不是去补缺的腿。
-- **持仓核对**：每 15 秒用 REST 核对真实持仓；刚成交过 5 秒内的交易所跳过，因为 Lighter 的 REST 持仓滞后于 ws 成交，否则会触发来回抽搐的假对冲。
-- **停机保护**：连续 3 次执行异常就停机，等人工平仓后重启。
+- **Market data**: subscribes to full-depth `order_book` on both sides (snapshot + deltas). Deltas carry a nonce; a gap means an update was lost, so the book is cleared and resubscribed — it never quotes off an incomplete book. A quiet market does not count as stale data; only a dropped connection does.
+- **Order size**: walks the book level by level to find how much size is still available at the current spread, takes `take_fraction` of it, and clips it to the per-order notional cap and the position cap. It is not a fixed size.
+- **Fill confirmation**: both legs send IOC orders simultaneously and wait for each order's final state on the authenticated `account_orders` channel, getting the exact filled size and average price.
+- **Leg imbalance**: when net exposure exceeds `net_tolerance_base`, the excess leg is reduced with `reduce_only` (reduce only, never add, so it can't be rejected for insufficient margin) rather than topping up the short leg.
+- **Position reconciliation**: real positions are checked via REST every 15 seconds; a venue that filled within the last 5 seconds is skipped, because Lighter's REST positions lag ws fills and would otherwise trigger false back-and-forth hedges.
+- **Halt protection**: after 3 consecutive execution errors the engine halts; flatten manually and restart.
 
-## 旧脚本
+## Legacy scripts
 
-`monitor.py` / `analyze.py` / `alert.py` 是早期的顶档采集、回测和桌面提醒工具，读写 `data/premium_data.csv`，与新引擎无关，保留用于分析历史数据。新引擎自己的采集在 `logs/minutes.csv`，对应 `tools/analyze.py`。
+`monitor.py` / `analyze.py` / `alert.py` are early top-of-book collection, backtesting and desktop alert tools that read and write `data/premium_data.csv`. They are unrelated to the new engine and kept for analysing historical data. The new engine's own recorder writes `logs/minutes.csv`, analysed by `tools/analyze.py`.

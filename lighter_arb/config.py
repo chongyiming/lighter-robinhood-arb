@@ -249,30 +249,26 @@ def load_config(config_file: str = "config.yaml", env_file: str = ".env", *,
     except FileNotFoundError:
         raise ConfigError(
             f"config file '{config_file}' not found — copy config.example.yaml "
-            f"to config.yaml and edit it / 未找到配置文件，请先复制 "
-            f"config.example.yaml 为 config.yaml 并修改")
+            f"to config.yaml and edit it")
     _validate(raw, _SCHEMA)
 
     symbol = (symbol or "").strip()
     if not symbol:
-        raise ConfigError("--symbol is required, e.g. --symbol BTC / "
-                          "必须用 --symbol 指定交易品种")
+        raise ConfigError("--symbol is required, e.g. --symbol BTC")
     for flag, venue in (("--base", base_venue), ("--hedge", hedge_venue)):
         if venue not in VENUES:
             raise ConfigError(
-                f"{flag} must be one of {list(VENUES)}, got {venue!r} / "
-                f"{flag} 必须是 {list(VENUES)} 之一")
+                f"{flag} must be one of {list(VENUES)}, got {venue!r}")
     if base_venue == hedge_venue:
         raise ConfigError(
             f"--base and --hedge are both {base_venue!r} — that is the same "
-            f"market on both legs / 两条腿是同一个市场")
+            f"market on both legs")
 
     thr = raw.get("thresholds") or {}
     for k in ("midline_bps", "upper_bps", "lower_bps"):
         if k not in thr:
             raise ConfigError(f"'thresholds.{k}' is required — derive it from "
-                              f"recorded minute data / 必须填写，请用采集的分钟"
-                              f"数据计算后填入")
+                              f"recorded minute data")
     upper, lower = float(thr["upper_bps"]), float(thr["lower_bps"])
     if upper <= 0 or lower <= 0:
         raise ConfigError("thresholds.upper_bps and lower_bps must be > 0 "
@@ -282,7 +278,7 @@ def load_config(config_file: str = "config.yaml", env_file: str = ".env", *,
     if not 0.0 < take_fraction <= 1.0:
         raise ConfigError("sizing.take_fraction must be in (0, 1] — taking "
                           "more than the profitable depth loses money on the "
-                          "tail / 必须在 (0, 1] 之间")
+                          "tail")
 
     # "base" / "hedge" are roles, not venues: the engine reads the key to tell
     # the two band directions apart (engine._eff_threshold).

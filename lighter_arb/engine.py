@@ -146,8 +146,7 @@ class Engine:
                 raise RuntimeError(
                     "live trading needs credentials for both venues in .env "
                     "(see .env.example); use --record-only to run without "
-                    "them / 实盘需要在 .env 中配置两个交易所的密钥，仅采集数据"
-                    "请用 --record-only")
+                    "them")
             self.base.init_signer()
             self.hedge.init_signer()
 
@@ -474,8 +473,8 @@ class Engine:
             if self.consec_errors >= cfg.max_consecutive_errors:
                 self.halted = True
                 log.critical("HALTED after %d consecutive execution problems "
-                             "— flatten manually and restart / 连续执行异常，"
-                             "引擎已停止，请手动平仓后重启", self.consec_errors)
+                             "— flatten manually and restart",
+                             self.consec_errors)
         if sent_ok:
             self.trades += 1
             self.total_exp_edge += plan.exp_edge_usd
